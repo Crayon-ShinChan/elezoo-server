@@ -14,4 +14,8 @@ module.exports = {
     enable: true,
     package: "egg-bcrypt",
   },
+  validate: {
+    enable: true,
+    package: "egg-validate",
+  },
 };
