@@ -3,17 +3,46 @@
 const Service = require("egg").Service;
 
 class UserService extends Service {
+  async index() {
+    const users = await this.ctx.model.User.find({});
+    if (!users) {
+      this.ctx.throw(404, "users not found");
+    }
+    return users;
+  }
+
+  async show(_id) {
+    const user = await this.ctx.service.user.find(_id);
+    if (!user) {
+      this.ctx.throw(404, "user not found");
+    }
+    return user;
+  }
+
   async create(payload) {
     const { ctx } = this;
-    const users = await ctx.model.User.find({
-      email: payload.email,
-    });
+    const users = payload.phone
+      ? await ctx.model.User.find({
+          $or: [
+            { email: payload.email },
+            { userName: payload.userName },
+            { phone: payload.phone },
+          ],
+        })
+      : await ctx.model.User.find({
+          $or: [{ email: payload.email }, { userName: payload.userName }],
+        });
+    console.log(users);
     if (users.length >= 1) {
-      ctx.throw(409, "mail exists");
+      ctx.throw(409, "username/email/phone exists");
       return;
     }
     payload.password = await ctx.genHash(payload.password);
     return ctx.model.User.create(payload);
+  }
+
+  async find(id) {
+    return this.ctx.model.User.findById(id);
   }
 }
 

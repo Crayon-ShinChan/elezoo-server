@@ -7,7 +7,7 @@ module.exports = (app) => {
       type: String,
       unique: true,
       required: true,
-      match: /^[a-zA-Z\u4E00-\u9FA5][a-zA-Z0-9\u4E00-\u9FA5_-]{1,15}$/,
+      //match: /^[a-zA-Z\u4E00-\u9FA5][a-zA-Z0-9\u4E00-\u9FA5_-]{1,15}$/,
     },
     email: {
       type: String,
@@ -19,7 +19,11 @@ module.exports = (app) => {
       type: String,
       required: true,
     },
-    phone: { type: String, match: /^[0-9]{11}$/ },
+    phone: {
+      type: String,
+      unique: true,
+      // match: /^[0-9]{11}$/
+    },
     avatar: { type: String },
     gender: { type: String },
     createdAt: { type: Date, default: Date.now },
