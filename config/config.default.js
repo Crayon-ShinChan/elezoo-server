@@ -43,6 +43,10 @@ module.exports = (appInfo) => {
     saltRounds: 10,
   };
 
+  config.jwt = {
+    secret: "971028",
+  };
+
   return {
     ...config,
     ...userConfig,
