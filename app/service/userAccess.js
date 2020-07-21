@@ -28,7 +28,6 @@ class UserAccessService extends Service {
     }
     // delete user.password;
     user.password = undefined;
-    console.log(user);
     return user;
   }
 

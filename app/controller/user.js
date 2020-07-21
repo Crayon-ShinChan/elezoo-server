@@ -7,7 +7,7 @@ const userCreateTransfer = {
     type: "string",
     required: true,
     allowEmpty: false,
-    format: /^[a-zA-Z\u4E00-\u9FA5][a-zA-Z0-9\u4E00-\u9FA5_-]{1,15}$/,
+    format: /^[a-zA-Z\u4E00-\u9FA5][a-zA-Z0-9\u4E00-\u9FA5_-]{1,14}$/,
   },
   email: { type: "email", required: true },
   password: {
@@ -23,7 +23,7 @@ const userUpdateTransfer = {
     type: "string",
     required: false,
     allowEmpty: false,
-    format: /^[a-zA-Z\u4E00-\u9FA5][a-zA-Z0-9\u4E00-\u9FA5_-]{1,15}$/,
+    format: /^[a-zA-Z\u4E00-\u9FA5][a-zA-Z0-9\u4E00-\u9FA5_-]{1,14}$/,
   },
   email: { type: "email", required: false },
   password: {

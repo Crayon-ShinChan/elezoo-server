@@ -24,8 +24,8 @@ exports.formatTime = (time) => moment(time).format("YYYY-MM-DD HH:mm:ss");
 
 // 处理成功响应
 exports.success = ({ ctx, code = 200, res = {}, msg }) => {
-  if (!res) code = 404;
-  ctx.status = 200;
+  // if (!res) code = 404;
+  ctx.status = code;
   ctx.body = {
     code: code,
     message: msg || ctx.helper.errorCode[code],
@@ -34,7 +34,7 @@ exports.success = ({ ctx, code = 200, res = {}, msg }) => {
 };
 
 exports.fail = ({ ctx, code = 500, res = {}, msg }) => {
-  ctx.status = 200;
+  ctx.status = code;
   ctx.body = {
     code: code,
     message: msg || ctx.helper.errorCode[code],
