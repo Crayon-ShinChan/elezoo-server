@@ -26,6 +26,7 @@ exports.formatTime = (time) => moment(time).format("YYYY-MM-DD HH:mm:ss");
 exports.success = ({ ctx, code = 200, res = {}, msg }) => {
   // if (!res) code = 404;
   ctx.status = code;
+  if (code === 204) ctx.status = 200;
   ctx.body = {
     code: code,
     message: msg || ctx.helper.errorCode[code],

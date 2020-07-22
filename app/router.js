@@ -8,10 +8,11 @@ module.exports = (app) => {
   router.get("/", controller.home.index);
   router.get("/api/user", controller.user.index);
   router.get("/api/user/:id", controller.user.show);
-  router.post("/api/user/signup", controller.user.create);
-  router.put("/api/user/:id", controller.user.update);
-  router.delete("/api/user/:id", controller.user.destroy);
-
-  router.post("/api/user/access/login", controller.userAccess.login);
-  router.get("/api/user/access/current", jwt, controller.userAccess.current);
+  router.get("/api/user/current", jwt, controller.user.current);
+  router.post("/api/user/create", controller.user.create);
+  router.post("/api/user/login", controller.user.login);
+  // router.put("/api/user/:id", controller.user.update);
+  router.put("/api/user", jwt, controller.user.update);
+  router.put("/api/user/password", jwt, controller.user.updatePassword);
+  router.delete("/api/user", jwt, controller.user.destroy);
 };
