@@ -53,6 +53,8 @@ class UserController extends Controller {
   async create() {
     const { ctx, service } = this;
     ctx.validate(userCreateTransfer);
+    // console.log("request:", ctx.request);
+    // console.log("request:", ctx.request.body);
     const payload = ctx.request.body;
     const res = await service.user.create(payload);
     // ctx.status = 201;

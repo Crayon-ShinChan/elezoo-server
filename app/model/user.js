@@ -25,6 +25,7 @@ module.exports = (app) => {
       // match: /^[0-9]{11}$/
     },
     avatar: { type: String },
+    avatarBackup: { type: Array },
     gender: { type: String },
     createdAt: { type: Date, default: Date.now },
   });

@@ -40,7 +40,7 @@ class UserService extends Service {
       : await ctx.model.User.find({
           $or: [{ email: payload.email }, { userName: payload.userName }],
         });
-    console.log(users);
+    // console.log(users);
     if (users.length >= 1) {
       ctx.throw(409, "userName or email or phone exists");
       return;
@@ -96,7 +96,10 @@ class UserService extends Service {
     if (!user) {
       ctx.throw(404, "user not found");
     }
-    payload.password = undefined;
+    if (payload.password) {
+      delete payload.password;
+    }
+    console.log(payload);
     const res = await ctx.model.User.findByIdAndUpdate(_id, payload, {
       new: true,
     });

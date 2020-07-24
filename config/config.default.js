@@ -66,6 +66,16 @@ module.exports = (appInfo) => {
     secret: "971028",
   };
 
+  config.multipart = {
+    mode: "file",
+  };
+
+  config.cors = {
+    origin: (ctx) => ctx.get("origin"),
+    allowMethods: "GET,HEAD,PUT,POST,DELETE,PATCH",
+    credentials: true,
+  };
+
   return {
     ...config,
     ...userConfig,
