@@ -20,10 +20,7 @@ class UserService extends Service {
   }
 
   async show(_id) {
-    const user = await this.find(_id);
-    if (!user) {
-      this.ctx.throw(404, "user not found");
-    }
+    let user = await this.checkUser(_id);
     user.email = undefined;
     user.phone = undefined;
     user.password = undefined;
@@ -93,10 +90,7 @@ class UserService extends Service {
     const { ctx, service } = this;
     // ctx.state.user 可以提取到JWT编码的data
     const _id = ctx.state.user.data._id;
-    let user = await service.user.find(_id);
-    if (!user) {
-      ctx.throw(404, "user is not found");
-    }
+    let user = await this.checkUser(_id);
     // delete user.password;
     user.password = undefined;
     return user;
@@ -105,10 +99,7 @@ class UserService extends Service {
   async update(payload) {
     const { ctx } = this;
     const _id = ctx.state.user.data._id;
-    const user = await this.find(_id);
-    if (!user) {
-      ctx.throw(404, "user not found");
-    }
+    let user = await this.checkUser(_id);
     if (payload.password) {
       delete payload.password;
     }
@@ -124,10 +115,7 @@ class UserService extends Service {
     const { ctx } = this;
     const { oldPassword, password } = payload;
     const _id = ctx.state.user.data._id;
-    const user = await this.find(_id);
-    if (!user) {
-      ctx.throw(404, "user not found");
-    }
+    let user = await this.checkUser(_id);
     const verifyPsw = await ctx.compare(oldPassword, user.password);
     if (!verifyPsw) {
       ctx.throw(401);
@@ -143,19 +131,24 @@ class UserService extends Service {
   async destroy(password) {
     const { ctx } = this;
     const _id = ctx.state.user.data._id;
-    const user = await this.find(_id);
-    if (!user) {
-      ctx.throw(404, "user not found");
-    }
+    let user = await this.checkUser(_id);
     const verifyPsw = await ctx.compare(password, user.password);
-    if (!verifyPsw) {
-      ctx.throw(401);
-    }
+    if (!verifyPsw) ctx.throw(401);
     return ctx.model.User.findByIdAndRemove(_id);
   }
 
-  async find(id) {
-    return this.ctx.model.User.findById(id);
+  // common func
+
+  async find(_id) {
+    return this.ctx.model.User.findById(_id);
+  }
+
+  async checkUser(_id) {
+    const user = await this.find(_id);
+    if (!user) {
+      this.ctx.throw(404, "user not found");
+    }
+    return user;
   }
 }
 
