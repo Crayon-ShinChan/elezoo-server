@@ -22,10 +22,11 @@ module.exports = (app) => {
   router.post("/api/pic/songkeys", controller.pic.uploadStreamSonkeys);
 
   router.get("/api/vote", jwt, controller.vote.index);
-  router.post("/api/vote/create", jwt, controller.vote.create);
   router.get("/api/vote/:id", jwt, controller.vote.show);
+  router.post("/api/vote/create", jwt, controller.vote.create);
   router.delete("/api/vote/:id", jwt, controller.vote.destroy);
+  router.put("/api/vote/basic/:id", jwt, controller.vote.updateBasic);
   router.put("/api/vote/leave/:id", jwt, controller.vote.leave);
   router.put("/api/vote/invite/:id", jwt, controller.vote.invite);
-  router.put("/api/vote/period", jwt, controller.vote.updatePeriod);
+  router.put("/api/vote/period/:id", jwt, controller.vote.nextPeriod);
 };

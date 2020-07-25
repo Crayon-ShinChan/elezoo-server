@@ -46,11 +46,19 @@ class VoteController extends Controller {
     ctx.helper.success({ ctx, code: 201, res });
   }
 
-  async updatePeriod() {
+  async nextPeriod() {
     const { ctx, service } = this;
     const payload = ctx.request.body;
     const { id } = ctx.params;
-    const res = await service.vote.updatePeriod(id, payload);
+    const res = await service.vote.nextPeriod(id, payload);
+    ctx.helper.success({ ctx, code: 201, res });
+  }
+
+  async updateBasic() {
+    const { ctx, service } = this;
+    const payload = ctx.request.body;
+    const { id } = ctx.params;
+    const res = await service.vote.updateBasic(id, payload);
     ctx.helper.success({ ctx, code: 201, res });
   }
 }

@@ -171,8 +171,88 @@ class VoteController extends Service {
     );
   }
 
-  async updatePeriod() {
-    
+  async nextPeriod(_id, { next }) {
+    // next 只有三个值 "proposing", "voting", "end" validate
+    const { ctx, service } = this;
+    const _userId = ctx.service.user.data._id;
+    await service.user.checkUser(_userId);
+    const vote = await ctx.model.Vote.findById(_id).lean();
+    // vote exist
+    if (!vote) ctx.throw(404);
+    // own vote
+    if (!vote.owner.toString() === _userId) ctx.throw(401);
+    const periods = ["proposing", "voting", "end"];
+    const times = ["proposeStart", "voteStart", "voteEnd"];
+    let shift = false;
+    let conflict = false;
+    let nextPropertyIdx = 0;
+    for (let idx = 0; idx < period.length; idx++) {
+      if (next === periods[idx]) {
+        shift = true;
+        nextPropertyIdx = idx;
+        if (vote.hasOwnProperty(times[idx])) {
+          conflict = true;
+          break;
+        }
+        continue;
+      }
+      if (shift) {
+        if (vote.hasOwnProperty(times[idx])) {
+          conflict = true;
+          break;
+        }
+      } else {
+        if (!vote.hasOwnProperty(times[idx])) {
+          conflict = true;
+          break;
+        }
+      }
+    }
+    if (conflict) ctx.throw(403, "时间设置冲突");
+    return ctx.model.Vote.findByIdAndUpdate(
+      _id,
+      {
+        [times[nextPropertyIdx]]: new Date(),
+      },
+      { new: true }
+    );
+  }
+
+  async updateBasic() {
+    const { ctx, service } = this;
+    const _userId = ctx.service.user.data._id;
+    await service.user.checkUser(_userId);
+    let vote = await ctx.model.Vote.findById(_id).lean();
+    // vote exist
+    if (!vote) ctx.throw(404);
+    // own vote
+    if (!vote.owner.toString() === _userId) ctx.throw(401);
+    vote = await this.getPeriod(vote, new Date());
+    if (vote.period === "end" || vote.period === "voting") {
+      if (
+        payload.hasOwnProperty("voteStart") &&
+        vote.hasOwnProperty("voteStart") &&
+        payload.voteStart != vote.voteStart
+      )
+        ctx.throw(403, "不能更改前置时间");
+      if (
+        payload.hasOwnProperty("proposeStart") &&
+        vote.hasOwnProperty("proposeStart") &&
+        payload.proposeStart != vote.proposeStart
+      )
+        ctx.throw(403, "不能更改前置时间");
+    } else if (vote.period === "proposing") {
+      if (
+        payload.hasOwnProperty("proposeStart") &&
+        vote.hasOwnProperty("proposeStart") &&
+        payload.proposeStart != vote.proposeStart
+      )
+        ctx.throw(403, "不能更改前置时间");
+    }
+    await this.checkTime({ ...vote, ...payload });
+    return ctx.model.User.findByIdAndUpdate(_id, payload, {
+      new: true,
+    });
   }
 
   // common
