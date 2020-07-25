@@ -49,8 +49,78 @@ class PicService extends Service {
 
     return res;
   }
+  async uploadStream({ buffer, backup = false } = {}) {
+    const { ctx } = this;
+    let buf;
+    let res = { urlBackup: [] };
+    let stream;
+    if (buffer) {
+      buf = buffer;
+      // console.log("buffer:", buffer);
+    } else {
+      stream = await ctx.getFileStream();
+      // console.log("stream:", stream);
+      const parts = await toArray(stream);
+      // console.log("parts:", parts);
+      buf = Buffer.concat(parts);
+    }
 
-  async uploadStream({ buffer, host = "ali" } = {}) {
+    // console.log("final buf:", buf);
+    // identicon 的 buffer 传入 alibaba 的 api 会出现未知错误
+    // await upimg.alibaba
+    //   .upload(buf)
+    //   .then((json) => {
+    //     console.log("ali:", json);
+    //     if (("ali:", json.success)) {
+    //       res.url = json.url;
+    //     } else {
+    //       ctx.throw(500, err, message);
+    //     }
+    //   })
+    //   .catch((err) => {
+    //     ctx.throw(500, err.message);
+    //   });
+
+    await upimg.toutiao
+      .upload(buf)
+      .then((json) => {
+        // console.log("toutiao", json);
+        if (json.success) {
+          res.url = json.url;
+        } else {
+          ctx.throw(500, err, message);
+        }
+      })
+      .catch((err) => {
+        ctx.throw(500, err.message);
+      });
+
+    if (backup) {
+      await upimg.jd.upload(buf).then((json) => {
+        // console.log("jd", json);
+        if (json.success) {
+          res.urlBackup.push(json.url);
+        }
+      });
+    }
+
+    return res;
+  }
+
+  async convertToPicBed(src) {
+    const { ctx } = this;
+    const res = await ctx
+      .curl(`https://api.yum6.cn/sinaimg.php?img=${src}`, {
+        method: "GET",
+        dataType: "json",
+        timeout: 10000,
+      })
+      .then((res) => `https://ww1.sinaimg.cn/large/${res.data.pid}.jpg`);
+
+    return res;
+  }
+
+  async uploadStreamSonkeys({ buffer, host = "ali" } = {}) {
     const { ctx } = this;
     let buf;
     let res;

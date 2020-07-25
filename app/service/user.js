@@ -1,6 +1,9 @@
 "use strict";
 
 const Service = require("egg").Service;
+const identicon = require("identicon");
+const fs = require("fs");
+const FormStream = require("formstream");
 
 class UserService extends Service {
   async index() {
@@ -28,7 +31,7 @@ class UserService extends Service {
   }
 
   async create(payload) {
-    const { ctx } = this;
+    const { ctx, service } = this;
     const users = payload.phone
       ? await ctx.model.User.find({
           $or: [
@@ -46,6 +49,16 @@ class UserService extends Service {
       return;
     }
     payload.password = await ctx.genHash(payload.password);
+
+    const buffer = identicon.generateSync({ id: payload.userName, size: 160 });
+    // const form = new FormStream();
+    // form.buffer("image", buffer, "image.png");
+    const backup = true;
+    const resAvatar = await service.pic.uploadStream({ buffer, backup });
+    console.log("resAvatar:", resAvatar);
+    payload.avatar = resAvatar.url;
+    payload.avatarBackup = resAvatar.urlBackup;
+    // fs.writeFileSync(this.config.baseDir + "/app/public/identicon.png", buffer);
     return ctx.model.User.create(payload);
   }
 

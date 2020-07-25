@@ -17,5 +17,6 @@ module.exports = (app) => {
   router.delete("/api/user", jwt, controller.user.destroy);
 
   router.post("/api/pic", controller.pic.upload);
-  // router.post("/api/pic/stream", controller.pic.uploadStream);
+  router.post("/api/pic/stream", controller.pic.uploadStream);
+  router.post("/api/pic/songkeys", controller.pic.uploadStreamSonkeys);
 };
