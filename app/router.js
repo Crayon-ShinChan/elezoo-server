@@ -28,5 +28,7 @@ module.exports = (app) => {
   router.put("/api/vote/basic/:id", jwt, controller.vote.updateBasic);
   router.put("/api/vote/leave/:id", jwt, controller.vote.leave);
   router.put("/api/vote/invite/:id", jwt, controller.vote.invite);
-  router.put("/api/vote/period/:id", jwt, controller.vote.nextPeriod);
+  router.put("/api/vote/next/:id", jwt, controller.vote.nextPeriod);
+  router.put("/api/vote/propose/:id", jwt, controller.vote.propose);
+  router.put("/api/vote/vote/:id", jwt, controller.vote.vote);
 };

@@ -87,6 +87,7 @@ class VoteController extends Service {
   }
 
   async create(payload) {
+    // payload: title, voter, detail, cover, proposeStart, voteStart, voteEnd, privacyOption, showProposer
     const { ctx, service } = this;
     // console.log("ctx.state:", ctx.state);
     const _userId = ctx.state.user.data._id;
@@ -108,10 +109,24 @@ class VoteController extends Service {
 
     // let vote = await ctx.model.Vote.findById(_id).lean();
     let vote = await ctx.model.Vote.findById(_id).lean();
-    console.log(vote);
     if (!vote) ctx.throw(404);
-    vote = await this.getPeriod(vote, new Date());
     if (vote.owner != _userId && vote.voters.include(_userId)) ctx.throw(401);
+    vote = await this.getPeriod(vote, new Date());
+    if (vote.privacyOption === "anonymity") {
+      vote.proposals.forEach((proposal) => {
+        delete proposal.proposer;
+        proposal.votes.forEach((vote) => {
+          delete vote.supporter;
+        });
+      });
+    } else if (vote.privacyOption === "free") {
+      vote.proposals.forEach((proposal) => {
+        if (proposal.privacy === "anonymity") delete proposal.proposer;
+        proposal.votes.forEach((vote) => {
+          if (vote.privacy === "anonymity") delete vote.supporter;
+        });
+      });
+    }
     return vote;
   }
 
@@ -122,8 +137,8 @@ class VoteController extends Service {
     // check if own this vote
     const vote = await ctx.model.Vote.findById(_id);
     if (!vote) ctx.throw(404);
-    if (vote.owner !== "_userId") ctx.throw(401);
-    return ctx.model.User.findByIdAndRemove(_id);
+    if (vote.owner.toString() !== _userId) ctx.throw(401);
+    return ctx.model.Vote.findByIdAndRemove(_id);
   }
 
   async leave(_id) {
@@ -160,7 +175,7 @@ class VoteController extends Service {
     // vote exist
     if (!vote) ctx.throw(404);
     // own vote
-    if (!vote.owner.toString() === _userId) ctx.throw(401);
+    if (!(vote.owner.toString() === _userId)) ctx.throw(401);
     // update, invitee is a list
     return ctx.model.Vote.findByIdAndUpdate(
       _id,
@@ -171,25 +186,29 @@ class VoteController extends Service {
     );
   }
 
-  async nextPeriod(_id, { next }) {
-    // next 只有三个值 "proposing", "voting", "end" validate
+  async nextPeriod(_id) {
     const { ctx, service } = this;
-    const _userId = ctx.service.user.data._id;
+    const _userId = ctx.state.user.data._id;
+    const now = new Date();
     await service.user.checkUser(_userId);
-    const vote = await ctx.model.Vote.findById(_id).lean();
+    let vote = await ctx.model.Vote.findById(_id).lean();
     // vote exist
     if (!vote) ctx.throw(404);
     // own vote
-    if (!vote.owner.toString() === _userId) ctx.throw(401);
-    const periods = ["proposing", "voting", "end"];
-    const times = ["proposeStart", "voteStart", "voteEnd"];
+    if (vote.owner.toString() !== _userId) ctx.throw(401);
+
+    const periods = ["notStarted", "proposing", "voting", "end"];
+    const times = ["createAt", "proposeStart", "voteStart", "voteEnd"];
     let shift = false;
     let conflict = false;
-    let nextPropertyIdx = 0;
-    for (let idx = 0; idx < period.length; idx++) {
+    // find next
+    vote = await this.getPeriod(vote, now);
+    if (vote.period === "end") ctx.throw(403, "投票流程已经结束");
+    let nextPeriodIdx = periods.indexOf(vote.period) + 1;
+    let next = periods[nextPeriodIdx];
+    for (let idx = 0; idx < periods.length; idx++) {
       if (next === periods[idx]) {
         shift = true;
-        nextPropertyIdx = idx;
         if (vote.hasOwnProperty(times[idx])) {
           conflict = true;
           break;
@@ -212,47 +231,146 @@ class VoteController extends Service {
     return ctx.model.Vote.findByIdAndUpdate(
       _id,
       {
-        [times[nextPropertyIdx]]: new Date(),
+        [times[nextPeriodIdx]]: now,
       },
       { new: true }
     );
   }
 
-  async updateBasic() {
+  async updateBasic(_id, payload) {
     const { ctx, service } = this;
-    const _userId = ctx.service.user.data._id;
+    const _userId = ctx.state.user.data._id;
     await service.user.checkUser(_userId);
     let vote = await ctx.model.Vote.findById(_id).lean();
     // vote exist
     if (!vote) ctx.throw(404);
     // own vote
-    if (!vote.owner.toString() === _userId) ctx.throw(401);
+    if (!(vote.owner.toString() === _userId)) ctx.throw(401);
     vote = await this.getPeriod(vote, new Date());
+    // process payload
+    if (payload.hasOwnProperty("proposeStart"))
+      payload.voteStart = new Date(payload.voteStart);
+    if (payload.hasOwnProperty("voteStart"))
+      payload.voteStart = new Date(payload.voteStart);
+    if (payload.hasOwnProperty("voteEnd"))
+      payload.voteEnd = new Date(payload.voteEnd);
+    // https://stackoverflow.com/questions/7244513/javascript-date-comparisons-dont-equal#:~:text=5%20Answers&text=When%20you%20use,type%2C%20so%20it%20returns%20false.
     if (vote.period === "end" || vote.period === "voting") {
       if (
         payload.hasOwnProperty("voteStart") &&
         vote.hasOwnProperty("voteStart") &&
-        payload.voteStart != vote.voteStart
+        payload.voteStart.getTime() !== vote.voteStart.getTime()
       )
         ctx.throw(403, "不能更改前置时间");
       if (
         payload.hasOwnProperty("proposeStart") &&
         vote.hasOwnProperty("proposeStart") &&
-        payload.proposeStart != vote.proposeStart
+        payload.proposeStart.getTime() !== vote.proposeStart.getTime()
       )
         ctx.throw(403, "不能更改前置时间");
     } else if (vote.period === "proposing") {
       if (
         payload.hasOwnProperty("proposeStart") &&
         vote.hasOwnProperty("proposeStart") &&
-        payload.proposeStart != vote.proposeStart
+        payload.proposeStart.getTime() !== vote.proposeStart.getTime()
       )
         ctx.throw(403, "不能更改前置时间");
     }
+    // console.log({ ...vote, ...payload });
     await this.checkTime({ ...vote, ...payload });
-    return ctx.model.User.findByIdAndUpdate(_id, payload, {
+    return ctx.model.Vote.findByIdAndUpdate(_id, payload, {
       new: true,
     });
+  }
+
+  async propose(_id, payload) {
+    const { ctx, service } = this;
+    const _userId = ctx.state.user.data._id;
+    await service.user.checkUser(_userId);
+    let vote = await ctx.model.Vote.findById(_id).lean();
+    // vote exist
+    if (!vote) ctx.throw(404);
+    // is voters
+    const voters = [];
+    vote.voters.forEach((voter) => {
+      voters.push(voter.toString());
+    });
+    if (!voters.includes(_userId)) ctx.throw(401);
+    // proposing period validator
+    const now = new Date();
+    vote = await this.getPeriod(vote, now);
+    if (vote.period !== "proposing") ctx.throw(403, "不在提议阶段");
+    // content validator
+    let { content, privacy = "realName" } = payload;
+    const proposals = await ctx.model.Vote.find({
+      _id: _id,
+      proposals: { $elemMatch: { content } },
+    });
+    if (proposals.length > 0) ctx.throw(403, "存在相同提议");
+
+    if (vote.privacyOption !== "free") privacy = vote.privacyOption;
+    return ctx.model.Vote.findByIdAndUpdate(
+      _id,
+      {
+        $push: {
+          proposals: {
+            content,
+            proposer: _userId,
+            privacy,
+          },
+        },
+      },
+      {
+        new: true,
+        // because this is update method, it won't use validator automatically
+        // unlike create method, required fields may already exist, so run validator explicitly
+        runValidators: true,
+      }
+    );
+  }
+
+  async vote(_id, payload) {
+    const { ctx, service } = this;
+    const _userId = ctx.state.user.data._id;
+    await service.user.checkUser(_userId);
+    let vote = await ctx.model.Vote.findById(_id).lean();
+    // vote exist
+    if (!vote) ctx.throw(404);
+    // is voters
+    const voters = [];
+    vote.voters.forEach((voter) => {
+      voters.push(voter.toString());
+    });
+    if (!voters.includes(_userId)) ctx.throw(401);
+    // voting period validator
+    const now = new Date();
+    vote = await this.getPeriod(vote, now);
+    if (vote.period !== "voting") ctx.throw(403, "不在投票阶段");
+    // already vote
+    const alreadyVote = await ctx.model.Vote.find({
+      _id: _id,
+      "proposals.votes.supporter": _userId,
+    });
+    if (alreadyVote.length > 0) ctx.throw(403, "已经投过票了");
+    // vote
+    let { proposalIds = [], privacy = "realName" } = payload;
+    if (vote.privacyOption !== "free") privacy = vote.privacyOption;
+    // https://stackoverflow.com/questions/10432677/update-field-in-exact-element-array-in-mongodb
+    for (let idx = 0; idx < proposalIds.length; idx++) {
+      await ctx.model.Vote.findOneAndUpdate(
+        { _id: _id, "proposals._id": proposalIds[idx] },
+        {
+          $push: {
+            "proposals.$.votes": {
+              supporter: _userId,
+              privacy,
+            },
+          },
+        },
+        { runValidators: true }
+      );
+    }
+    return ctx.model.Vote.findById(_id);
   }
 
   // common

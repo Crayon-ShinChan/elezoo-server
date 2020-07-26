@@ -3,16 +3,23 @@ module.exports = (app) => {
   const Schema = mongoose.Schema;
 
   const proposalSchema = new Schema({
-    content: { type: String, required: true },
+    content: { type: String, unique: true, required: true }, // unique for a single vote or all?
     proposer: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
       ref: "User",
     },
-    supporter: [
+    privacy: { type: String, required: true },
+    createAt: { type: Date, required: true, default: Date.now },
+    votes: [
       {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
+        supporter: {
+          type: mongoose.Schema.Types.ObjectId,
+          required: true,
+          ref: "User",
+        },
+        privacy: { type: String, required: true },
+        createAt: { type: Date, required: true, default: Date.now },
       },
     ],
   });
@@ -24,6 +31,7 @@ module.exports = (app) => {
       required: true,
       ref: "User",
     },
+    detail: { type: String },
     cover: { type: String },
     privacyOption: { type: String, required: true, default: "realName" },
     showProposer: { type: Boolean, required: true, default: false },

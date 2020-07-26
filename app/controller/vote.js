@@ -28,7 +28,7 @@ class VoteController extends Controller {
     const { ctx, service } = this;
     const { id } = ctx.params;
     const res = await service.vote.destroy(id);
-    ctx.helper.success({ ctx, res });
+    ctx.helper.success({ ctx, code: 204, res });
   }
 
   async leave() {
@@ -48,9 +48,8 @@ class VoteController extends Controller {
 
   async nextPeriod() {
     const { ctx, service } = this;
-    const payload = ctx.request.body;
     const { id } = ctx.params;
-    const res = await service.vote.nextPeriod(id, payload);
+    const res = await service.vote.nextPeriod(id);
     ctx.helper.success({ ctx, code: 201, res });
   }
 
@@ -59,6 +58,22 @@ class VoteController extends Controller {
     const payload = ctx.request.body;
     const { id } = ctx.params;
     const res = await service.vote.updateBasic(id, payload);
+    ctx.helper.success({ ctx, code: 201, res });
+  }
+
+  async propose() {
+    const { ctx, service } = this;
+    const payload = ctx.request.body;
+    const { id } = ctx.params;
+    const res = await service.vote.propose(id, payload);
+    ctx.helper.success({ ctx, code: 201, res });
+  }
+
+  async vote() {
+    const { ctx, service } = this;
+    const payload = ctx.request.body;
+    const { id } = ctx.params;
+    const res = await service.vote.vote(id, payload);
     ctx.helper.success({ ctx, code: 201, res });
   }
 }
