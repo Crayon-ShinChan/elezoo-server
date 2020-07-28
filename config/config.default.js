@@ -25,8 +25,9 @@ module.exports = (appInfo) => {
 
   config.mongoose = {
     client: {
-      url:
-        "mongodb+srv://kuiliang:zklzwcGG123@cluster0.ljvzl.mongodb.net/elezoo?retryWrites=true&w=majority",
+      // url:
+      //   "mongodb+srv://kuiliang:zklzwcGG123@cluster0.ljvzl.mongodb.net/elezoo?retryWrites=true&w=majority",
+      url: "mongodb://127.0.0.1:27017/elezoo",
       options: { useUnifiedTopology: true },
       // mongoose global plugins, expected a function or an array of function and options
       // plugins: [createdPlugin, [updatedPlugin, pluginOptions]],

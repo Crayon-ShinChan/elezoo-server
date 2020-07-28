@@ -3,7 +3,7 @@ module.exports = (app) => {
   const Schema = mongoose.Schema;
 
   const proposalSchema = new Schema({
-    content: { type: String, unique: true, required: true }, // unique for a single vote or all?
+    content: { type: String, required: true }, // unique for a single vote or all?
     proposer: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,

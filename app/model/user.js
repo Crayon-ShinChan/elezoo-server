@@ -21,8 +21,9 @@ module.exports = (app) => {
     },
     phone: {
       type: String,
+      index: true,
       unique: true,
-      // match: /^[0-9]{11}$/
+      sparse: true,
     },
     avatar: { type: String },
     avatarBackup: { type: Array },

@@ -7,17 +7,24 @@ class VoteController extends Service {
   async index(payload) {
     const { ctx, service } = this;
     const _userId = ctx.state.user.data._id;
+    const now = new Date();
     await service.user.checkUser(_userId);
     if (!payload.hasOwnProperty("direct")) {
       payload.direct = {};
     }
     if (!payload.hasOwnProperty("indirect")) {
-      return ctx.model.Vote.find({
+      let items = await ctx.model.Vote.find({
         $or: [
           { owner: _userId, ...payload.direct },
           { voters: _userId, ...payload.direct },
         ],
-      });
+      }).lean();
+      for (let idx = 0; idx < items.length; idx++) {
+        items[idx].period = await service.vote.getPeriod(items[idx], now);
+        let ownerInfo = await service.user.show(items[idx].owner);
+        items[idx].ownerAvatar = ownerInfo.avatar;
+      }
+      return items;
     }
 
     const condition = {
@@ -44,7 +51,6 @@ class VoteController extends Service {
         }
       });
     }
-    const now = new Date();
     if (
       payload.indirect.hasOwnProperty("periods") &&
       payload.indirect.periods.length > 0
@@ -78,12 +84,13 @@ class VoteController extends Service {
     // the document object you get back from mongoose doesn't access the properties directly. It uses the prototype chain hence hasOwnProperty returning false (I am simplifying this greatly).
     // https://stackoverflow.com/questions/30923378/why-does-mongoose-models-hasownproperty-return-false-when-property-does-exist
     // https://stackoverflow.com/questions/9952649/convert-mongoose-docs-to-json
-    let res = await ctx.model.Vote.find(condition).lean();
-    res.forEach((vote) => {
-      service.vote.getPeriod(vote, now);
-    });
-
-    return res;
+    let items = await ctx.model.Vote.find(condition).lean();
+    for (let idx = 0; idx < items.length; idx++) {
+      items[idx].period = await service.vote.getPeriod(items[idx], now);
+      let ownerInfo = await service.user.show(items[idx].owner);
+      items[idx].ownerAvatar = ownerInfo.avatar;
+    }
+    return items;
   }
 
   async create(payload) {
@@ -99,6 +106,7 @@ class VoteController extends Service {
     } else {
       payload.voters = [_userId];
     }
+    console.log("payload", payload);
     return ctx.model.Vote.create(payload);
   }
 
@@ -111,7 +119,7 @@ class VoteController extends Service {
     let vote = await ctx.model.Vote.findById(_id).lean();
     if (!vote) ctx.throw(404);
     if (vote.owner != _userId && vote.voters.include(_userId)) ctx.throw(401);
-    vote = await this.getPeriod(vote, new Date());
+    vote.period = await this.getPeriod(vote, new Date());
     if (vote.privacyOption === "anonymity") {
       vote.proposals.forEach((proposal) => {
         delete proposal.proposer;
@@ -202,7 +210,7 @@ class VoteController extends Service {
     let shift = false;
     let conflict = false;
     // find next
-    vote = await this.getPeriod(vote, now);
+    vote.period = await this.getPeriod(vote, now);
     if (vote.period === "end") ctx.throw(403, "投票流程已经结束");
     let nextPeriodIdx = periods.indexOf(vote.period) + 1;
     let next = periods[nextPeriodIdx];
@@ -246,7 +254,7 @@ class VoteController extends Service {
     if (!vote) ctx.throw(404);
     // own vote
     if (!(vote.owner.toString() === _userId)) ctx.throw(401);
-    vote = await this.getPeriod(vote, new Date());
+    vote.period = await this.getPeriod(vote, new Date());
     // process payload
     if (payload.hasOwnProperty("proposeStart"))
       payload.voteStart = new Date(payload.voteStart);
@@ -284,6 +292,7 @@ class VoteController extends Service {
   }
 
   async propose(_id, payload) {
+    // content + privacy
     const { ctx, service } = this;
     const _userId = ctx.state.user.data._id;
     await service.user.checkUser(_userId);
@@ -298,7 +307,7 @@ class VoteController extends Service {
     if (!voters.includes(_userId)) ctx.throw(401);
     // proposing period validator
     const now = new Date();
-    vote = await this.getPeriod(vote, now);
+    vote.period = await this.getPeriod(vote, now);
     if (vote.period !== "proposing") ctx.throw(403, "不在提议阶段");
     // content validator
     let { content, privacy = "realName" } = payload;
@@ -308,7 +317,9 @@ class VoteController extends Service {
     });
     if (proposals.length > 0) ctx.throw(403, "存在相同提议");
 
-    if (vote.privacyOption !== "free") privacy = vote.privacyOption;
+    if (vote.privacyOption !== "free" && vote.privacyOption !== privacy)
+      ctx.throw(403, "隐私设置不被允许");
+
     return ctx.model.Vote.findByIdAndUpdate(
       _id,
       {
@@ -344,7 +355,7 @@ class VoteController extends Service {
     if (!voters.includes(_userId)) ctx.throw(401);
     // voting period validator
     const now = new Date();
-    vote = await this.getPeriod(vote, now);
+    vote.period = await this.getPeriod(vote, now);
     if (vote.period !== "voting") ctx.throw(403, "不在投票阶段");
     // already vote
     const alreadyVote = await ctx.model.Vote.find({
@@ -394,25 +405,21 @@ class VoteController extends Service {
 
   async getPeriod(vote, now) {
     // console.log(vote);
-    if (
-      (vote.hasOwnProperty("proposeStart") && now < vote.proposeStart) ||
-      !vote.hasOwnProperty("proposeStart")
-    ) {
-      vote.period = "notStarted";
-    } else if (
-      (vote.hasOwnProperty("voteStart") && now < vote.voteStart) ||
-      !vote.hasOwnProperty("voteStart")
-    ) {
-      vote.period = "proposing";
-    } else if (
-      (vote.hasOwnProperty("voteEnd") && now < vote.voteEnd) ||
-      !vote.hasOwnProperty("voteEnd")
-    ) {
-      vote.period = "voting";
+    // console.log(now.getTime());
+    let period = undefined;
+    if ((vote.proposeStart && now < vote.proposeStart) || !vote.proposeStart) {
+      // console.log(now, " | ", vote.proposeStart);
+      // console.log("notStarted");
+      period = "notStarted";
+    } else if ((vote.voteStart && now < vote.voteStart) || !vote.voteStart) {
+      period = "proposing";
+    } else if ((vote.voteEnd && now < vote.voteEnd) || !vote.voteEnd) {
+      period = "voting";
     } else {
-      vote.period = "end";
+      period = "end";
     }
-    return vote;
+    // console.log(period);
+    return period;
   }
 }
 
