@@ -48,8 +48,9 @@ class VoteController extends Controller {
 
   async nextPeriod() {
     const { ctx, service } = this;
+    const payload = ctx.request.body;
     const { id } = ctx.params;
-    const res = await service.vote.nextPeriod(id);
+    const res = await service.vote.nextPeriod(id, payload);
     ctx.helper.success({ ctx, code: 201, res });
   }
 

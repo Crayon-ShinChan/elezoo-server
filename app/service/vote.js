@@ -194,7 +194,7 @@ class VoteController extends Service {
     );
   }
 
-  async nextPeriod(_id) {
+  async nextPeriod(_id, { next = undefined } = {}) {
     const { ctx, service } = this;
     const _userId = ctx.state.user.data._id;
     const now = new Date();
@@ -204,38 +204,43 @@ class VoteController extends Service {
     if (!vote) ctx.throw(404);
     // own vote
     if (vote.owner.toString() !== _userId) ctx.throw(401);
+    // has next
+    if (!next) ctx.throw(400, "没有指定下一阶段");
+    // check time
+    await this.checkTime(vote);
 
     const periods = ["notStarted", "proposing", "voting", "end"];
     const times = ["createAt", "proposeStart", "voteStart", "voteEnd"];
-    let shift = false;
-    let conflict = false;
     // find next
     vote.period = await this.getPeriod(vote, now);
     if (vote.period === "end") ctx.throw(403, "投票流程已经结束");
     let nextPeriodIdx = periods.indexOf(vote.period) + 1;
-    let next = periods[nextPeriodIdx];
-    for (let idx = 0; idx < periods.length; idx++) {
-      if (next === periods[idx]) {
-        shift = true;
-        if (vote.hasOwnProperty(times[idx])) {
-          conflict = true;
-          break;
-        }
-        continue;
-      }
-      if (shift) {
-        if (vote.hasOwnProperty(times[idx])) {
-          conflict = true;
-          break;
-        }
-      } else {
-        if (!vote.hasOwnProperty(times[idx])) {
-          conflict = true;
-          break;
-        }
-      }
-    }
-    if (conflict) ctx.throw(403, "时间设置冲突");
+    let realNext = periods[nextPeriodIdx];
+    if (realNext !== next) ctx.throw(400, "时间设置冲突");
+    // let shift = false;
+    // let conflict = false;
+    // for (let idx = 0; idx < periods.length; idx++) {
+    //   if (next === periods[idx]) {
+    //     shift = true;
+    //     if (vote.hasOwnProperty(times[idx])) {
+    //       conflict = true;
+    //       break;
+    //     }
+    //     continue;
+    //   }
+    //   if (shift) {
+    //     if (vote.hasOwnProperty(times[idx])) {
+    //       conflict = true;
+    //       break;
+    //     }
+    //   } else {
+    //     if (!vote.hasOwnProperty(times[idx])) {
+    //       conflict = true;
+    //       break;
+    //     }
+    //   }
+    // }
+    // if (conflict) ctx.throw(403, "时间设置冲突");
     return ctx.model.Vote.findByIdAndUpdate(
       _id,
       {

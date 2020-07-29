@@ -35,6 +35,7 @@ module.exports = (app) => {
     cover: { type: String },
     privacyOption: { type: String, required: true, default: "realName" },
     showProposer: { type: Boolean, required: true, default: false },
+    multiChoice: { type: Boolean, required: true, default: true },
     createAt: { type: Date, required: true, default: Date.now },
     proposeStart: { type: Date },
     voteStart: { type: Date },
