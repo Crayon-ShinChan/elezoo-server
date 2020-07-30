@@ -1,6 +1,7 @@
 "use strict";
 
 const Service = require("egg").Service;
+const Avatar = require("avatar-builder");
 const identicon = require("identicon");
 const fs = require("fs");
 const FormStream = require("formstream");
@@ -47,9 +48,31 @@ class UserService extends Service {
     }
     payload.password = await ctx.genHash(payload.password);
 
-    const buffer = identicon.generateSync({ id: payload.userName, size: 160 });
+    // https://www.npmjs.com/package/identicon
+    // const buffer = identicon.generateSync({ id: payload.userName, size: 160 });
     // const form = new FormStream();
     // form.buffer("image", buffer, "image.png");
+
+    // https://www.npmjs.com/package/avatar-builder
+    // const avatar = Avatar.catBuilder(128);
+    const avatar = Avatar.builder(
+      Avatar.Image.compose(
+        Avatar.Image.randomFillStyle(),
+        Avatar.Image.longShadow(
+          Avatar.Image.margin(Avatar.Image.cat(), 20)
+          // {
+          //   blur: 5,
+          //   offsetX: 2.5,
+          //   offsetY: -2.5,
+          //   color: "rgba(0,0,0,0.75)",
+          // }
+        )
+      ),
+      128,
+      128
+    );
+    const buffer = await avatar.create(payload.userName);
+
     const backup = true;
     const resAvatar = await service.pic.uploadStream({ buffer, backup });
     console.log("resAvatar:", resAvatar);

@@ -77,6 +77,28 @@ class VoteController extends Controller {
     const res = await service.vote.vote(id, payload);
     ctx.helper.success({ ctx, code: 201, res });
   }
+
+  async hasVoted() {
+    const { ctx, service } = this;
+    const { id } = ctx.params;
+    const res = await service.vote.hasVoted(id);
+    ctx.helper.success({ ctx, res });
+  }
+
+  async getVotePeriod() {
+    const { ctx, service } = this;
+    const { id } = ctx.params;
+    const res = await service.vote.getVotePeriod(id);
+    ctx.helper.success({ ctx, res });
+  }
+
+  async deleteProposal() {
+    const { ctx, service } = this;
+    const { id } = ctx.params;
+    const payload = ctx.request.body;
+    const res = await service.vote.deleteProposal(id, payload);
+    ctx.helper.success({ ctx, code: 204, res });
+  }
 }
 
 module.exports = VoteController;

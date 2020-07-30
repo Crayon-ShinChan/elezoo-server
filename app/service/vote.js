@@ -3,7 +3,7 @@
 const Service = require("egg").Service;
 var mongoose = require("mongoose");
 
-class VoteController extends Service {
+class VoteService extends Service {
   async index(payload) {
     const { ctx, service } = this;
     const _userId = ctx.state.user.data._id;
@@ -21,8 +21,6 @@ class VoteController extends Service {
       }).lean();
       for (let idx = 0; idx < items.length; idx++) {
         items[idx].period = await service.vote.getPeriod(items[idx], now);
-        let ownerInfo = await service.user.show(items[idx].owner);
-        items[idx].ownerAvatar = ownerInfo.avatar;
       }
       return items;
     }
@@ -213,34 +211,10 @@ class VoteController extends Service {
     const times = ["createAt", "proposeStart", "voteStart", "voteEnd"];
     // find next
     vote.period = await this.getPeriod(vote, now);
-    if (vote.period === "end") ctx.throw(403, "投票流程已经结束");
+    if (vote.period === "end") ctx.throw(400, "投票流程已经结束");
     let nextPeriodIdx = periods.indexOf(vote.period) + 1;
     let realNext = periods[nextPeriodIdx];
     if (realNext !== next) ctx.throw(400, "时间设置冲突");
-    // let shift = false;
-    // let conflict = false;
-    // for (let idx = 0; idx < periods.length; idx++) {
-    //   if (next === periods[idx]) {
-    //     shift = true;
-    //     if (vote.hasOwnProperty(times[idx])) {
-    //       conflict = true;
-    //       break;
-    //     }
-    //     continue;
-    //   }
-    //   if (shift) {
-    //     if (vote.hasOwnProperty(times[idx])) {
-    //       conflict = true;
-    //       break;
-    //     }
-    //   } else {
-    //     if (!vote.hasOwnProperty(times[idx])) {
-    //       conflict = true;
-    //       break;
-    //     }
-    //   }
-    // }
-    // if (conflict) ctx.throw(403, "时间设置冲突");
     return ctx.model.Vote.findByIdAndUpdate(
       _id,
       {
@@ -345,7 +319,47 @@ class VoteController extends Service {
     );
   }
 
+  async deleteProposal(_id, payload) {
+    // proposeId
+    const { ctx, service } = this;
+    const _userId = ctx.state.user.data._id;
+    await service.user.checkUser(_userId);
+    let vote = await ctx.model.Vote.findById(_id).lean();
+    // vote exist
+    if (!vote) ctx.throw(404);
+    // proposal validate
+    const { proposalId } = payload;
+    if (!proposalId) ctx.throw(400, "请输入提议ID");
+    let proposal = await ctx.model.Vote.findOne({
+      _id: _id,
+      proposals: { $elemMatch: { _id: proposalId } },
+    })
+      .select({ proposals: { $elemMatch: { _id: proposalId } } })
+      .lean();
+    if (!proposal) ctx.throw(400, "不存在该提议");
+    // auth
+    if (
+      vote.owner.toString() !== _userId &&
+      proposal.proposals[0].proposer.toString() !== _userId
+    )
+      ctx.throw(401);
+    // delete
+
+    return ctx.model.Vote.findByIdAndUpdate(
+      _id,
+      {
+        $pull: {
+          proposals: {
+            _id: proposalId,
+          },
+        },
+      },
+      { new: true }
+    );
+  }
+
   async vote(_id, payload) {
+    // proposalIds + privacy
     const { ctx, service } = this;
     const _userId = ctx.state.user.data._id;
     await service.user.checkUser(_userId);
@@ -370,6 +384,12 @@ class VoteController extends Service {
     if (alreadyVote.length > 0) ctx.throw(403, "已经投过票了");
     // vote
     let { proposalIds = [], privacy = "realName" } = payload;
+    // check multiChoice
+    if (proposalIds.length === 0) {
+      ctx.throw(400, "选择选项后再投票");
+    } else if (!vote.multiChoice && proposalIds.length > 1) {
+      ctx.throw(400, "投票不支持多选");
+    }
     if (vote.privacyOption !== "free") privacy = vote.privacyOption;
     // https://stackoverflow.com/questions/10432677/update-field-in-exact-element-array-in-mongodb
     for (let idx = 0; idx < proposalIds.length; idx++) {
@@ -389,6 +409,43 @@ class VoteController extends Service {
     return ctx.model.Vote.findById(_id);
   }
 
+  async hasVoted(_id) {
+    const { ctx, service } = this;
+    const _userId = ctx.state.user.data._id;
+    await service.user.checkUser(_userId);
+    let vote = await ctx.model.Vote.findById(_id).lean();
+    // vote exist
+    if (!vote) ctx.throw(404);
+    // is voters
+    const voters = [];
+    vote.voters.forEach((voter) => {
+      voters.push(voter.toString());
+    });
+    if (!voters.includes(_userId)) ctx.throw(401);
+    // judge
+    const alreadyVote = await ctx.model.Vote.find({
+      _id: _id,
+      "proposals.votes.supporter": _userId,
+    });
+    return alreadyVote.length > 0;
+  }
+
+  async getVotePeriod(_id) {
+    const { ctx, service } = this;
+    const _userId = ctx.state.user.data._id;
+    await service.user.checkUser(_userId);
+    let vote = await ctx.model.Vote.findById(_id).lean();
+    // vote exist
+    if (!vote) ctx.throw(404);
+    // is voters
+    const voters = [];
+    vote.voters.forEach((voter) => {
+      voters.push(voter.toString());
+    });
+    if (!voters.includes(_userId)) ctx.throw(401);
+    return this.getPeriod(vote, new Date());
+  }
+
   // common
 
   async checkTime(payload) {
@@ -400,11 +457,11 @@ class VoteController extends Service {
     } = payload;
 
     if (voteEnd) {
-      if (!(voteStart && proposeStart)) ctx.throw(403, "时间设置冲突");
-      if (voteEnd < voteStart) ctx.throw(403, "时间设置冲突");
+      if (!(voteStart && proposeStart)) ctx.throw(400, "时间设置冲突");
+      if (voteEnd < voteStart) ctx.throw(400, "时间设置冲突");
     } else if (voteStart) {
-      if (!proposeStart) ctx.throw(403, "时间设置冲突");
-      if (voteStart < proposeStart) ctx.throw(403, "时间设置冲突");
+      if (!proposeStart) ctx.throw(400, "时间设置冲突");
+      if (voteStart < proposeStart) ctx.throw(400, "时间设置冲突");
     }
   }
 
@@ -428,4 +485,4 @@ class VoteController extends Service {
   }
 }
 
-module.exports = VoteController;
+module.exports = VoteService;
