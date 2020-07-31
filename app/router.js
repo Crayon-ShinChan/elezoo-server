@@ -26,6 +26,7 @@ module.exports = (app) => {
   router.get("/api/vote/hasvoted/:id", jwt, controller.vote.hasVoted);
   router.get("/api/vote/period/:id", jwt, controller.vote.getVotePeriod);
   router.post("/api/vote/create", jwt, controller.vote.create);
+  router.post("/api/vote/share/:id", jwt, controller.vote.share);
   router.delete("/api/vote/:id", jwt, controller.vote.destroy);
   router.delete("/api/vote/proposal/:id", jwt, controller.vote.deleteProposal);
   router.put("/api/vote/basic/:id", jwt, controller.vote.updateBasic);

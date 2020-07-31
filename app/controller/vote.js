@@ -99,6 +99,13 @@ class VoteController extends Controller {
     const res = await service.vote.deleteProposal(id, payload);
     ctx.helper.success({ ctx, code: 204, res });
   }
+
+  async share() {
+    const { ctx, service } = this;
+    const { id } = ctx.params;
+    const res = await service.vote.share(id);
+    ctx.helper.success({ ctx, res });
+  }
 }
 
 module.exports = VoteController;

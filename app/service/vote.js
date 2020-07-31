@@ -1,7 +1,7 @@
 "use strict";
 
 const Service = require("egg").Service;
-var mongoose = require("mongoose");
+const { v1: uuidv1, v4: uuidv4 } = require("uuid");
 
 class VoteService extends Service {
   async index(payload) {
@@ -97,6 +97,10 @@ class VoteService extends Service {
     // console.log("ctx.state:", ctx.state);
     const _userId = ctx.state.user.data._id;
     await service.user.checkUser(_userId);
+    if (payload.proposeStart)
+      payload.proposeStart = new Date(payload.proposeStart);
+    if (payload.voteStart) payload.voteStart = new Date(payload.voteStart);
+    if (payload.voteEnd) payload.voteEnd = new Date(payload.voteEnd);
     await this.checkTime(payload);
     payload.owner = _userId;
     if (payload.hasOwnProperty("voters")) {
@@ -235,12 +239,10 @@ class VoteService extends Service {
     if (!(vote.owner.toString() === _userId)) ctx.throw(401);
     vote.period = await this.getPeriod(vote, new Date());
     // process payload
-    if (payload.hasOwnProperty("proposeStart"))
-      payload.voteStart = new Date(payload.voteStart);
-    if (payload.hasOwnProperty("voteStart"))
-      payload.voteStart = new Date(payload.voteStart);
-    if (payload.hasOwnProperty("voteEnd"))
-      payload.voteEnd = new Date(payload.voteEnd);
+    if (payload.proposeStart)
+      payload.proposeStart = new Date(payload.proposeStart);
+    if (payload.voteStart) payload.voteStart = new Date(payload.voteStart);
+    if (payload.voteEnd) payload.voteEnd = new Date(payload.voteEnd);
     // https://stackoverflow.com/questions/7244513/javascript-date-comparisons-dont-equal#:~:text=5%20Answers&text=When%20you%20use,type%2C%20so%20it%20returns%20false.
     if (vote.period === "end" || vote.period === "voting") {
       if (
@@ -249,6 +251,7 @@ class VoteService extends Service {
         payload.voteStart.getTime() !== vote.voteStart.getTime()
       )
         ctx.throw(403, "不能更改前置时间");
+
       if (
         payload.hasOwnProperty("proposeStart") &&
         vote.hasOwnProperty("proposeStart") &&
@@ -265,9 +268,35 @@ class VoteService extends Service {
     }
     // console.log({ ...vote, ...payload });
     await this.checkTime({ ...vote, ...payload });
-    return ctx.model.Vote.findByIdAndUpdate(_id, payload, {
-      new: true,
-    });
+    const {
+      title,
+      detail,
+      cover,
+      proposeStart,
+      voteStart,
+      voteEnd,
+      showProposer,
+    } = payload;
+    let newVote = await ctx.model.Vote.findByIdAndUpdate(
+      _id,
+      {
+        title,
+        detail,
+        cover,
+        proposeStart,
+        voteStart,
+        voteEnd,
+        showProposer,
+      },
+      {
+        new: true,
+      }
+    ).lean();
+    console.log("newVote");
+    newVote.period = await this.getPeriod(vote, new Date());
+    console.log(newVote.period);
+    console.log(newVote);
+    return newVote;
   }
 
   async propose(_id, payload) {
@@ -446,6 +475,18 @@ class VoteService extends Service {
     return this.getPeriod(vote, new Date());
   }
 
+  async share(_id) {
+    const { ctx, service } = this;
+    const _userId = ctx.state.user.data._id;
+    await service.user.checkUser(_userId);
+    let vote = await ctx.model.Vote.findById(_id).lean();
+    // vote exist
+    if (!vote) ctx.throw(404);
+    // is owner
+    if (!(vote.owner.toString() === _userId)) ctx.throw(401);
+    return uuidv1();
+  }
+
   // common
 
   async checkTime(payload) {
@@ -455,13 +496,17 @@ class VoteService extends Service {
       voteStart = undefined,
       voteEnd = undefined,
     } = payload;
+    // console.log("----------", proposeStart, " | ", voteStart, " | ", voteEnd);
 
     if (voteEnd) {
-      if (!(voteStart && proposeStart)) ctx.throw(400, "时间设置冲突");
-      if (voteEnd < voteStart) ctx.throw(400, "时间设置冲突");
-    } else if (voteStart) {
+      if (!voteStart) ctx.throw(400, "时间设置冲突");
+      if (voteEnd.getTime() < voteStart.getTime())
+        ctx.throw(400, "时间设置冲突");
+    }
+    if (voteStart) {
       if (!proposeStart) ctx.throw(400, "时间设置冲突");
-      if (voteStart < proposeStart) ctx.throw(400, "时间设置冲突");
+      if (voteStart.getTime() < proposeStart.getTime())
+        ctx.throw(400, "时间设置冲突");
     }
   }
 
@@ -469,6 +514,15 @@ class VoteService extends Service {
     // console.log(vote);
     // console.log(now.getTime());
     let period = undefined;
+    // console.log(
+    //   "----------",
+    //   vote.proposeStart,
+    //   " | ",
+    //   vote.voteStart,
+    //   " | ",
+    //   vote.voteEnd
+    // );
+    console.log(now);
     if ((vote.proposeStart && now < vote.proposeStart) || !vote.proposeStart) {
       // console.log(now, " | ", vote.proposeStart);
       // console.log("notStarted");

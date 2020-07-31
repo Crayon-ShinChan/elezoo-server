@@ -127,6 +127,19 @@ class UserService extends Service {
       delete payload.password;
     }
     console.log(payload);
+    const { userName, email, phone } = payload;
+    if (userName && userName !== user.userName) {
+      const anotherUser = await ctx.model.User.findOne({ userName });
+      if (anotherUser) ctx.throw(409, "用户名已存在");
+    }
+    if (email && email !== user.email) {
+      const anotherUser = await ctx.model.User.findOne({ email });
+      if (anotherUser) ctx.throw(409, "邮箱已存在");
+    }
+    if (phone && phone !== user.phone) {
+      const anotherUser = await ctx.model.User.findOne({ phone });
+      if (anotherUser) ctx.throw(409, "手机号码已存在");
+    }
     const res = await ctx.model.User.findByIdAndUpdate(_id, payload, {
       new: true,
     });
