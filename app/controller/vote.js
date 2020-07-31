@@ -97,13 +97,21 @@ class VoteController extends Controller {
     const { id } = ctx.params;
     const payload = ctx.request.body;
     const res = await service.vote.deleteProposal(id, payload);
-    ctx.helper.success({ ctx, code: 204, res });
+    ctx.helper.success({ ctx, res });
   }
 
   async share() {
     const { ctx, service } = this;
     const { id } = ctx.params;
     const res = await service.vote.share(id);
+    ctx.helper.success({ ctx, res });
+  }
+
+  async acceptShare() {
+    const { ctx, service } = this;
+    const { id } = ctx.params;
+    const payload = ctx.query;
+    const res = await service.vote.acceptShare(id, payload);
     ctx.helper.success({ ctx, res });
   }
 }

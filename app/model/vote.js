@@ -47,6 +47,14 @@ module.exports = (app) => {
       },
     ],
     proposals: [proposalSchema],
+    share: {
+      temp: { type: String },
+      perm: { type: String },
+      expireAt: {
+        type: Date,
+        default: () => new Date(+new Date() + 24 * 60 * 60 * 1000),
+      },
+    },
   });
 
   return mongoose.model("Vote", voteSchema, "votes");

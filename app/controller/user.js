@@ -104,7 +104,7 @@ class UserController extends Controller {
     const { ctx, service } = this;
     const { password } = ctx.request.body;
     const res = await service.user.destroy(password);
-    ctx.helper.success({ ctx, code: 204, res });
+    ctx.helper.success({ ctx, res });
   }
 }
 

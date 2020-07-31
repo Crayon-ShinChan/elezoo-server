@@ -2,6 +2,7 @@
 
 const Service = require("egg").Service;
 const { v1: uuidv1, v4: uuidv4 } = require("uuid");
+const mongoose = require("mongoose");
 
 class VoteService extends Service {
   async index(payload) {
@@ -120,7 +121,12 @@ class VoteService extends Service {
     // let vote = await ctx.model.Vote.findById(_id).lean();
     let vote = await ctx.model.Vote.findById(_id).lean();
     if (!vote) ctx.throw(404);
-    if (vote.owner != _userId && vote.voters.include(_userId)) ctx.throw(401);
+    // is voter
+    let isVoter = false;
+    vote.voters.forEach((voter) => {
+      if (voter.equals(_userId)) isVoter = true;
+    });
+    if (vote.owner !== _userId && !isVoter) ctx.throw(401);
     vote.period = await this.getPeriod(vote, new Date());
     if (vote.privacyOption === "anonymity") {
       vote.proposals.forEach((proposal) => {
@@ -484,7 +490,48 @@ class VoteService extends Service {
     if (!vote) ctx.throw(404);
     // is owner
     if (!(vote.owner.toString() === _userId)) ctx.throw(401);
-    return uuidv1();
+
+    // return uuidv1();
+    const temp = uuidv4();
+    const perm = uuidv4();
+    return await ctx.model.Vote.findOneAndUpdate(
+      { _id: _id },
+      {
+        share: {
+          temp: temp,
+          perm: perm,
+          expireAt: new Date(+new Date() + 24 * 60 * 60 * 1000),
+        },
+      },
+      { setDefaultsOnInsert: true, new: true }
+    );
+    return {
+      tempLink: `http://localhost:3333/#/share/${_id}?temp=${temp}`,
+      permLink: `http://localhost:3333/#/share/${_id}?perm=${perm}`,
+    };
+  }
+
+  async acceptShare(_id, payload) {
+    const { ctx, service } = this;
+    const _userId = ctx.state.user.data._id;
+    await service.user.checkUser(_userId);
+
+    let vote = await ctx.model.Vote.findById(_id).lean();
+    // vote exist
+    if (!vote) ctx.throw(404);
+    if (!vote.share) ctx.throw(401);
+    const { temp, perm } = payload;
+    console.log(new Date(), " | ", vote.share.expireAt);
+    if (
+      (temp && temp === vote.share.temp && new Date() < vote.share.expireAt) ||
+      (perm && perm === vote.share.perm)
+    )
+      return ctx.model.Vote.findByIdAndUpdate(
+        _id,
+        { $addToSet: { voters: _userId } },
+        { new: true }
+      );
+    ctx.throw(500);
   }
 
   // common
@@ -511,8 +558,6 @@ class VoteService extends Service {
   }
 
   async getPeriod(vote, now) {
-    // console.log(vote);
-    // console.log(now.getTime());
     let period = undefined;
     // console.log(
     //   "----------",
@@ -524,8 +569,6 @@ class VoteService extends Service {
     // );
     console.log(now);
     if ((vote.proposeStart && now < vote.proposeStart) || !vote.proposeStart) {
-      // console.log(now, " | ", vote.proposeStart);
-      // console.log("notStarted");
       period = "notStarted";
     } else if ((vote.voteStart && now < vote.voteStart) || !vote.voteStart) {
       period = "proposing";
@@ -534,7 +577,6 @@ class VoteService extends Service {
     } else {
       period = "end";
     }
-    // console.log(period);
     return period;
   }
 }

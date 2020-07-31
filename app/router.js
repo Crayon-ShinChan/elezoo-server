@@ -35,4 +35,5 @@ module.exports = (app) => {
   router.put("/api/vote/next/:id", jwt, controller.vote.nextPeriod);
   router.put("/api/vote/propose/:id", jwt, controller.vote.propose);
   router.put("/api/vote/vote/:id", jwt, controller.vote.vote);
+  router.patch("/api/vote/accept/:id", jwt, controller.vote.acceptShare);
 };
