@@ -18,6 +18,7 @@
     "formstream": "^1.1.0",
     "fs": "0.0.1-security",
     "identicon": "^3.0.1",
+    "nodemailer": "^6.4.11",
     "stream-to-array": "^2.3.0",
     "stream-wormhole": "^1.1.0",
     "upimg": "^0.5.0",

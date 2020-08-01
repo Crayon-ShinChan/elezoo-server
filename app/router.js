@@ -16,6 +16,8 @@ module.exports = (app) => {
   router.put("/api/user", jwt, controller.user.update);
   router.put("/api/user/password", jwt, controller.user.updatePassword);
   router.delete("/api/user", jwt, controller.user.destroy);
+  router.patch("/api/user/forget", controller.user.forget);
+  router.patch("/api/user/reset/:id", controller.user.reset);
 
   router.post("/api/pic", controller.pic.upload);
   router.post("/api/pic/stream", controller.pic.uploadStream);

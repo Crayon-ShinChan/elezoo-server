@@ -106,6 +106,23 @@ class UserController extends Controller {
     const res = await service.user.destroy(password);
     ctx.helper.success({ ctx, res });
   }
+
+  // 生成找回密码链接
+  async forget() {
+    const { ctx, service } = this;
+    const { email } = ctx.request.body;
+    const res = await service.user.forget(email);
+    ctx.helper.success({ ctx, res });
+  }
+
+  // 修改密码
+  async reset() {
+    const { ctx, service } = this;
+    const { uuid, password } = ctx.request.body;
+    const { id } = ctx.params;
+    const res = await service.user.reset(id, { uuid, password });
+    ctx.helper.success({ ctx, res });
+  }
 }
 
 module.exports = UserController;

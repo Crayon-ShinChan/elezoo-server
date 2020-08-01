@@ -29,6 +29,7 @@ module.exports = (app) => {
     avatarBackup: { type: Array },
     gender: { type: String },
     createdAt: { type: Date, default: Date.now },
+    reset: { uuid: { type: String }, expireAt: { type: Date } },
   });
 
   return mongoose.model("User", userSchema, "users");
