@@ -5,8 +5,34 @@ const Controller = require("egg").Controller;
 class VoteController extends Controller {
   async index() {
     const { ctx, service } = this;
-    const payload = ctx.request.body;
-    const res = await service.vote.index(payload);
+    let queries = ctx.query;
+    queries.title = Number(queries.title);
+    queries.createAt = Number(queries.createAt);
+    let filter = [];
+    const allFilterItems = [
+      { name: "roles", values: ["owner", "notOwner"] },
+      { name: "periods", values: ["notStarted", "proposing", "voting", "end"] },
+      { name: "privacyOptions", values: ["realName", "free", "anonymity"] },
+    ];
+    allFilterItems.forEach(({ name, values }) => {
+      filter[name] = [];
+      values.forEach((value) => {
+        if (queries[value] === "true") filter[name].push(value);
+      });
+    });
+    console.log(queries);
+    console.log(filter);
+    const { createAt, title, current, pageSize, searchContent } = queries;
+    const sortRule = createAt === 0 ? { title } : { createAt };
+    const res = await service.vote.index(
+      filter,
+      sortRule,
+      {
+        current,
+        pageSize,
+      },
+      searchContent
+    );
     ctx.helper.success({ ctx, res });
   }
 

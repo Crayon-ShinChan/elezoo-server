@@ -1,48 +1,36 @@
 "use strict";
 
 const Service = require("egg").Service;
-const { v1: uuidv1, v4: uuidv4 } = require("uuid");
-const mongoose = require("mongoose");
+const { v4: uuidv4 } = require("uuid");
 
 class VoteService extends Service {
-  async index(payload) {
+  async index(filter, sortRule, { current, pageSize }, searchContent) {
     const { ctx, service } = this;
     const _userId = ctx.state.user.data._id;
     const now = new Date();
     await service.user.checkUser(_userId);
-    if (!payload.hasOwnProperty("direct")) {
-      payload.direct = {};
-    }
-    if (!payload.hasOwnProperty("indirect")) {
-      let items = await ctx.model.Vote.find({
-        $or: [
-          { owner: _userId, ...payload.direct },
-          { voters: _userId, ...payload.direct },
-        ],
-      }).lean();
-      for (let idx = 0; idx < items.length; idx++) {
-        items[idx].period = await service.vote.getPeriod(items[idx], now);
-      }
-      return items;
-    }
 
-    const condition = {
-      $and: [
-        {
-          $or: [
-            { owner: _userId, ...payload.direct },
-            { voters: _userId, ...payload.direct },
-          ],
-        },
-      ],
-    };
-    const subCdtn = condition["$and"];
+    // let condition = {
+    //   $and: [
+    //     {
+    //       $or: [{ owner: _userId }, { voters: _userId }],
+    //     },
+    //   ],
+    // };
+    let subCdtn = [{ $or: [{ owner: _userId }, { voters: _userId }] }];
+    // let subCdtn = condition["$and"];
     if (
-      payload.indirect.hasOwnProperty("roles") &&
-      payload.indirect.roles.length > 0
+      filter.hasOwnProperty("privacyOptions") &&
+      filter.privacyOptions.length > 0
     ) {
       subCdtn.push({ $or: [] });
-      payload.indirect.roles.forEach((role) => {
+      filter.privacyOptions.forEach((privacyOption) => {
+        subCdtn[subCdtn.length - 1]["$or"].push({ privacyOption });
+      });
+    }
+    if (filter.hasOwnProperty("roles") && filter.roles.length > 0) {
+      subCdtn.push({ $or: [] });
+      filter.roles.forEach((role) => {
         if (role === "owner") {
           subCdtn[subCdtn.length - 1]["$or"].push({ owner: _userId });
         } else if (role === "notOwner") {
@@ -50,12 +38,9 @@ class VoteService extends Service {
         }
       });
     }
-    if (
-      payload.indirect.hasOwnProperty("periods") &&
-      payload.indirect.periods.length > 0
-    ) {
+    if (filter.hasOwnProperty("periods") && filter.periods.length > 0) {
       subCdtn.push({ $or: [] });
-      payload.indirect.periods.forEach((period) => {
+      filter.periods.forEach((period) => {
         if (period === "notStarted") {
           subCdtn[subCdtn.length - 1]["$or"].push({
             $or: [{ proposeStart: null }, { proposeStart: { $gt: now } }],
@@ -83,13 +68,31 @@ class VoteService extends Service {
     // the document object you get back from mongoose doesn't access the properties directly. It uses the prototype chain hence hasOwnProperty returning false (I am simplifying this greatly).
     // https://stackoverflow.com/questions/30923378/why-does-mongoose-models-hasownproperty-return-false-when-property-does-exist
     // https://stackoverflow.com/questions/9952649/convert-mongoose-docs-to-json
-    let items = await ctx.model.Vote.find(condition).lean();
+    let condition = {
+      $and: subCdtn,
+    };
+    if (searchContent) {
+      condition["$and"].push({
+        $or: [
+          {
+            title: { $regex: searchContent },
+          },
+          {
+            detail: { $regex: searchContent },
+          },
+        ],
+      });
+    }
+    console.log(condition);
+    let items = await ctx.model.Vote.find(condition).sort(sortRule).lean();
+    const total = items.length;
+    if (current && pageSize) {
+      items = items.slice(pageSize * (current - 1), pageSize * current);
+    }
     for (let idx = 0; idx < items.length; idx++) {
       items[idx].period = await service.vote.getPeriod(items[idx], now);
-      let ownerInfo = await service.user.show(items[idx].owner);
-      items[idx].ownerAvatar = ownerInfo.avatar;
     }
-    return items;
+    return { total, items };
   }
 
   async create(payload) {
@@ -586,7 +589,7 @@ class VoteService extends Service {
     //   " | ",
     //   vote.voteEnd
     // );
-    console.log(now);
+    // console.log(now);
     if ((vote.proposeStart && now < vote.proposeStart) || !vote.proposeStart) {
       period = "notStarted";
     } else if ((vote.voteStart && now < vote.voteStart) || !vote.voteStart) {
