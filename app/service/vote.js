@@ -166,7 +166,7 @@ class VoteService extends Service {
     if (!vote) ctx.throw(404);
     // own vote
     if (vote.owner.toString() === _userId)
-      ctx.throw(401, "You can leave because you are owner");
+      ctx.throw(401, "You can't leave because you are owner");
     // is voters
     const voters = [];
     vote.voters.forEach((voter) => {
@@ -481,7 +481,7 @@ class VoteService extends Service {
     return this.getPeriod(vote, new Date());
   }
 
-  async share(_id) {
+  async share(_id, payload) {
     const { ctx, service } = this;
     const _userId = ctx.state.user.data._id;
     await service.user.checkUser(_userId);
@@ -491,24 +491,17 @@ class VoteService extends Service {
     // is owner
     if (!(vote.owner.toString() === _userId)) ctx.throw(401);
 
-    // return uuidv1();
-    const temp = uuidv4();
-    const perm = uuidv4();
-    return await ctx.model.Vote.findOneAndUpdate(
+    // const expireAt = new Date(+new Date() + 24 * 60 * 60 * 1000);
+    const { active = true } = payload;
+    return ctx.model.Vote.findOneAndUpdate(
       { _id: _id },
       {
-        share: {
-          temp: temp,
-          perm: perm,
-          expireAt: new Date(+new Date() + 24 * 60 * 60 * 1000),
+        $set: {
+          "share.active": active,
         },
       },
-      { setDefaultsOnInsert: true, new: true }
+      { new: true }
     );
-    return {
-      tempLink: `http://localhost:3333/#/share/${_id}?temp=${temp}`,
-      permLink: `http://localhost:3333/#/share/${_id}?perm=${perm}`,
-    };
   }
 
   async acceptShare(_id, payload) {
@@ -519,19 +512,45 @@ class VoteService extends Service {
     let vote = await ctx.model.Vote.findById(_id).lean();
     // vote exist
     if (!vote) ctx.throw(404);
-    if (!vote.share) ctx.throw(401);
-    const { temp, perm } = payload;
-    console.log(new Date(), " | ", vote.share.expireAt);
-    if (
-      (temp && temp === vote.share.temp && new Date() < vote.share.expireAt) ||
-      (perm && perm === vote.share.perm)
-    )
-      return ctx.model.Vote.findByIdAndUpdate(
+    if (!vote.share.active) ctx.throw(401);
+    const { uuid } = payload;
+    // console.log(new Date(), " | ", vote.share.expireAt);
+    console.log(uuid);
+    console.log(vote);
+    if (uuid && uuid !== vote.share.uuid) ctx.throw(400, "链接错误");
+    if (uuid && uuid === vote.share.uuid) {
+      let newVote = await ctx.model.Vote.findByIdAndUpdate(
         _id,
         { $addToSet: { voters: _userId } },
         { new: true }
-      );
+      ).lean();
+      newVote.period = await this.getPeriod(newVote, new Date());
+      return newVote;
+    }
     ctx.throw(500);
+  }
+
+  async resetShareId(_id) {
+    const { ctx, service } = this;
+    const _userId = ctx.state.user.data._id;
+    await service.user.checkUser(_userId);
+    let vote = await ctx.model.Vote.findById(_id).lean();
+    // vote exist
+    if (!vote) ctx.throw(404);
+    // is owner
+    if (!(vote.owner.toString() === _userId)) ctx.throw(401);
+
+    const uuid = uuidv4();
+    // const expireAt = new Date(+new Date() + 24 * 60 * 60 * 1000);
+    return await ctx.model.Vote.findOneAndUpdate(
+      { _id: _id },
+      {
+        $set: {
+          "share.uuid": uuid,
+        },
+      },
+      { new: true }
+    );
   }
 
   // common

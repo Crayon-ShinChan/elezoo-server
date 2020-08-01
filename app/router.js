@@ -26,14 +26,15 @@ module.exports = (app) => {
   router.get("/api/vote/hasvoted/:id", jwt, controller.vote.hasVoted);
   router.get("/api/vote/period/:id", jwt, controller.vote.getVotePeriod);
   router.post("/api/vote/create", jwt, controller.vote.create);
-  router.post("/api/vote/share/:id", jwt, controller.vote.share);
   router.delete("/api/vote/:id", jwt, controller.vote.destroy);
   router.delete("/api/vote/proposal/:id", jwt, controller.vote.deleteProposal);
   router.put("/api/vote/basic/:id", jwt, controller.vote.updateBasic);
-  router.put("/api/vote/leave/:id", jwt, controller.vote.leave);
   router.put("/api/vote/invite/:id", jwt, controller.vote.invite);
   router.put("/api/vote/next/:id", jwt, controller.vote.nextPeriod);
   router.put("/api/vote/propose/:id", jwt, controller.vote.propose);
   router.put("/api/vote/vote/:id", jwt, controller.vote.vote);
+  router.patch("/api/vote/share/:id", jwt, controller.vote.share);
   router.patch("/api/vote/accept/:id", jwt, controller.vote.acceptShare);
+  router.patch("/api/vote/resetshareid/:id", jwt, controller.vote.resetShareId);
+  router.patch("/api/vote/leave/:id", jwt, controller.vote.leave);
 };
